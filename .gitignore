@@ -1,0 +1,7 @@
+node_modules/
+bcup
+
+.env
+package-lock.json
+mini.js
+
