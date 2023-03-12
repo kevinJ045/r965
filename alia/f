@@ -1,0 +1,1706 @@
+// +++ 
+// + Init
+// +++
+const express = require("express");
+const session = require("express-session");
+const fs = require('fs');
+const path = require('path');
+const OCLI = require("./OCLI/index");
+const cookieParser = require('cookie-parser');
+const { get } = require("express/lib/response");
+const { v4: uuidv4 } = require('uuid');
+const callMoxi = require('./lib/moxi');
+const tgBot = require('./lib/tg-bot');
+const crypto = require("crypto");
+const axios = require("gaxios");
+const request = require("request");
+const ejs = require("ejs");
+const cors = require('cors');
+const Identicon = require('./lib/identicon.js');
+const moxidata = require('./lib/data_manager');
+const { pickRandom, randFrom } = require('./lib/rand');
+const adminPage = require('./lib/admin');
+const http = require('./lib/http-req');
+const appShi = require('./lib/atcode');
+const readline = require("readline");
+
+
+// +++ 
+// + Declarations
+// +++
+var app = express();
+var server = require('http').createServer(app);
+
+const io = require("socket.io")(server);
+
+require("dotenv").config();
+
+
+// +++ 
+// + Function declaration
+// +++
+
+const uuidV4 = () => {
+	return uuidv4().replace('-','').substr(0, 12);
+}
+
+axios.get = (u) => {
+	return axios.request({url: u});
+}
+axios.post = (u) => {
+	return axios.request({url: u, method: 'POST'});
+}
+
+console.stdlog = console.log.bind(console);
+console.logs = [];
+console.log = function(){
+	if(input) input.pause();
+    console.logs.push(Array.from(arguments));
+    console.stdlog.apply(console, arguments);
+	if(console.onlog) console.onlog.apply(console, arguments);
+    if(input) input.resume();
+}
+
+var twirlTimer = function(text) {
+  var P = ["⠙", "⠘", "⠰", "⠴", "⠤", "⠦", "⠆", "⠃", "⠋", "⠉"];
+  var x = 0;
+  twirlTimer.timer = setInterval(function() {
+    process.stdout.write("\r" + P[x++] + " " + text || " loading");
+    x = x % P.length;
+  }, 100);
+}
+twirlTimer.timer = {};
+twirlTimer.clear = function(){
+	process.stdout.write("\n");
+	clearInterval(twirlTimer.timer);
+}
+
+
+// +++ 
+// + Constants
+// +++
+
+const COLORS = {
+	"aqua": [9, 210, 210, 255],
+	"blue": [0, 80, 255, 255],
+	"default": [234, 30, 99, 255],
+	"purple": [94, 19, 170, 255],
+	"green": [19, 170, 94, 255],
+	"orange": [255, 128, 0, 255]
+}
+
+COLORS['aqua']._h = 0x09D0D0;
+COLORS['blue']._h = 0x87b0f9;
+COLORS['default']._h = 0xffffff;
+COLORS['green']._h = 0xa6e3a1;
+COLORS['purple']._h = 0xcba6f7;
+COLORS['orange']._h = 0xfab387;
+
+var con = new OCLI({
+	pass: process.env.OCLI_DB_PASS,
+	database: process.env.DB_NAME,
+	path: "./OCLI/DataBases",
+	mongo: process.env.MONGO_URL
+});
+
+con.create('users', process.env.OCLI_DB_PASS, true);
+con.create('chats', process.env.OCLI_DB_PASS, true);
+con.create('links', process.env.OCLI_DB_PASS, true);
+con.create('posts', process.env.OCLI_DB_PASS, true);
+con.create('models', process.env.OCLI_DB_PASS, true);
+con.create('contact', process.env.OCLI_DB_PASS, true);
+con.create('inboxes', process.env.OCLI_DB_PASS, true);
+con.create('moxi', process.env.OCLI_DB_PASS, true);
+
+moxidata.makeData(con.db('moxi'));
+
+var port = process.env.PORT || 1284;
+var host = process.platform || 'localhost';
+var sessions = [];
+
+twirlTimer(' Loading');
+
+var hasarg = e => process.argv.join(' ').match(e);
+
+var input = hasarg('term') ? readline.createInterface({
+	input: process.stdin,
+	output: process.stdout,
+	prompt: '$ '
+}) : null;
+
+const sessionMiddleware = session({
+	secret: process.env.OCLI_DB_PASS,
+	resave: true,
+	saveUninitialized: true
+})
+
+
+// +++ 
+// + Middle Wares
+// +++
+
+app.use(sessionMiddleware);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+app.use(cors({
+	origin: []
+}));
+
+
+// +++ 
+// + Database Management
+// +++
+
+var dbLinks = con.db("links");
+var dbUsers = con.db("users");
+var dbChats = con.db("chats");
+var dbPosts = con.db("posts");
+var dbMods = con.db('models');
+
+const getPostID = () => {
+	var id = uuidV4();
+	if(dbPosts.find({id: id})) return getLinkID();
+	return id;
+};
+
+const addPost = (title,content,user,tags) => {
+	var id = getPostID();
+	var link = {
+		id: id,
+		content: content,
+		title: title,
+		time: new Date().getTime(),
+		tags: tags.match(",") ? tags.split(",") : [tags],
+		user: user,
+		reactions: {},
+		comments: []
+	};
+	var ps = dbUsers.find({username: user}).posts;
+	ps.push(id);
+	dbUsers.updateWhere({
+		username: user
+	},{
+		posts: "$_PUSH("+id+")"
+	});
+	dbPosts.insert(link);
+	return link;
+};
+
+
+const removePost = (id) => {
+	dbUsers.updateWhere({
+		username: getPost(id).user
+	},{
+		posts: "$_POP("+id+")"
+	})
+	dbPosts.update(function(a){
+		var data = a;
+		data = data.filter(function(dis){
+			return dis.id != id;
+		});
+		return data;
+	});
+};
+
+const getLinkID = () => {
+	var id = uuidV4();
+	if(dbLinks.find({id: id})) return getLinkID();
+	return id;
+};
+
+const addLink = (url,about,name,user) => {
+	var id = getLinkID();
+	var link = {
+		id: id,
+		url: url,
+		time: new Date().getTime(),
+		about: about,
+		name: name,
+		user: user.username || user
+	};
+	var userlinks = dbUsers.find({username: user.username || user}).links;
+	userlinks.push(id);
+	dbUsers.updateWhere({
+		username: user.username || user
+	},{
+		links: "$_PUSH("+id+")"
+	});
+	dbLinks.insert(link);
+	var li = dbLinks.find({ id });
+	if(dbLinks.filter({__id__: li.__id__}).length > 1){
+		dbLinks.updateWhere({
+			id
+		}, {
+			__id__: li.__id__+1
+		})
+	};
+	return link;
+};
+
+const removeLink = (id) => {
+	dbUsers.updateWhere({
+		username: getLink(id).user
+	},{
+		links: "$_POP("+id+")"
+	})
+	dbLinks.update(function(a){
+		var data = a;
+		data = data.filter(function(dis){
+			return dis.id != id;
+		});
+		return data;
+	});
+};
+
+const updateLinkMode = (id, mode) => {
+	dbLinks.updateWhere({
+		id
+	}, {
+		mode
+	});
+}
+
+const sendEditMode = (type, data) => {
+	var db;
+	var dt = {};
+	if(type == 'link'){
+		if(dbLinks.find({ id: data.id }).user != data.username) return 401;
+		if(!data.name || !data.url || !data.about) return 500;
+		dt.name = data.name;
+		dt.url = data.url;
+		dt.about = data.about;
+		db = dbLinks;
+	} else if(type == 'post'){
+		if(dbPosts.find({ id: data.id }).user != data.username) return 401;
+		if(!data.title || !data.content) return 500;
+		dt.title = data.title;
+		dt.content = data.content;
+		db = dbPosts;
+	} else {
+		return 500;
+	}
+	if(db) db.updateWhere({ id: data.id}, dt);
+	return 200;
+};
+
+const getLink = (id) => {
+	return dbLinks.find({id: id}) || dbLinks.find({__id__: id});
+};
+const getPost = (id) => {
+	return dbPosts.find({id: id}) || dbPosts.find({__id__: id});
+};
+getLink.name = b => {
+	return dbLinks.filter({name: b});
+};
+getLink.url = b => {
+	return dbLinks.filter({url: b});
+};
+getLink.user = b => {
+	return dbLinks.filter({user: b});
+};
+getLink.about = b => {
+	return dbLinks.filter({about: b});
+};
+
+const usrs = {
+	getAll(f){
+		var usrs = dbUsers.getAll();
+		return usrs.filter(a => a.username != "server").map(a => {
+			if(f) delete a.password;
+			return a;
+		});
+	},
+	register(username,pwd){
+		if(dbUsers.find({username: username})){
+			return "exists";
+		} else {
+			var user = {
+				username: username,
+				color: "default",
+				settings: {},
+				links: [],
+				posts: [],
+				time: new Date().getTime(),
+				password: md5(pwd)
+			}
+			dbUsers.insert(user);
+		}
+	},
+	get(username, i){
+		var usr = dbUsers.find({username: username});
+		if(i) delete usr.password;
+		return usr;
+	},
+	setSettings(username, settings){
+		return dbUsers.update((a) => {
+			var data = [];
+			a.forEach((item, i) => {
+				if(item.username == username) item.settings = settings;
+				data.push(item);
+			});
+			return data;
+		});
+	}
+};
+
+const LRN = {
+	getAll(){
+		var e = dbLinks.getAll();
+		e = e.filter(e => e.about.match(/\@\[\[LRN\:(.+)\]\]/));
+		return e || [];
+	},
+	insert(url, category, about, name, user){
+		about = "@[[LRN:" + category + "]]" + about;
+ 		return addLink(url, about, name, user);
+	}
+}
+
+const chdb = {
+	save(user, msg, db, opts){
+		var _db = (db || dbChats);
+		var all = _db.getAll();
+		if(all.length > 100){
+			var _id = all[0].id;
+			_db.update(function(a){
+				var data = a;
+				data = data.filter(function(dis){
+					return dis.id != _id;
+				});
+				return data;
+			});
+		}
+		if(usrs.get(user.username) && usrs.get(user.username).banned) return msg;
+		var tm = {
+			text: msg.text,
+			time: new Date().getTime(),
+			reply: msg.reply || null,
+			user: user.username,
+			id: msg.id
+		};
+		if(opts) {
+			for(var i in opts){
+				tm[i] = opts[i];
+			}
+		}
+		_db.insert(tm);
+		return tm;
+	},
+	get(id, db){
+		var _db = (db || dbChats);
+		var msg = _db.find({id: id});
+		if(!msg || !msg.user) return null;
+		msg.user = usrs.get(msg.user);
+		if(!msg.user) return null;
+		delete msg.user.password;
+		msg.user.time = new Date(msg.user.time);
+		if(msg.reply){
+			msg.reply.text = (chdb.get(msg.reply.to) || {}).text;
+		}
+		return msg;
+	},
+	getAll(db){
+		var _db = (db || dbChats);
+		var all = _db.getAll();
+		var results = [];
+		all.forEach((msg, i) => {
+			msg.user = usrs.get(msg.user.toLowerCase());
+			if(!msg.user && msg.user == 'server') msg.user = {'username': 'server', 'color': 'aqua'}
+			if(msg.user && msg.user.password) delete msg.user.password;
+			msg.time = new Date(msg.time);
+			if(msg.reply && chdb.get(msg.reply.to)){
+				msg.reply.text = (chdb.get(msg.reply.to) || {}).text;
+			}
+			results.push(msg);
+		});
+		return results;
+	}
+}
+
+const searchDB = (query, db, filterFunc, prop) => {
+	var qry = query.trim();
+	if(qry.length < 1) return res.send("nope");
+	var rg = /\@([A-Za-z]+)\:([A-Za-z0-9]+)/ig;
+	var params = {};
+	var results = [];
+
+	if(qry.match(rg)){
+		qry = qry.replace(rg, (a, b, c) => {
+			var key = a.split(':')[0].replace("@","");
+			var val = a.split(':')[1];
+
+			params[key] = val;
+
+			return "";
+		}).replace("  ", " ").trim();
+	}
+
+	results = db.filter((i, e) => {
+		if(!Object.keys(i).length) return false;
+		return filterFunc(i, qry,params);
+	});
+
+	if(results.length == 1 && results[0][prop || "name"] == null) results = [];
+
+	results = results.sort((a, b) => {
+		return a.match < b.match ? 1 : -1;
+	});
+
+	return results;
+};
+
+const getPaginated = (links, page) => {
+	var tosend = [];
+	var length = links.length;
+	if(length > 24) length = 24;
+	if(!isNaN(page)){
+		if(length*page > links.length) return null;
+		for (var i = 0; i < length*page; i++) {
+			links.shift();
+		}
+	}
+	for (var i = 0; i < length; i++) {
+		tosend.push(links[i]);
+	}
+	return tosend;
+}
+
+const makeTextEntry = (e) =>  e.substr(0, e.length < 5000 ? e.length : 5000).replace(/\</g, '&lt;')
+					.replace("<script>","&lt;script>")
+          .replace(/\n/g, '<br />')
+          .replace(/\&lt\;(\/|)b\>/g, '<b>')
+          .replace(/\&lt\;(\/|)u\>/g, '<u>')
+          .replace(/\&lt\;(\/|)i\>/g, '<i>')
+          .replace(/__([0-9A-Za-z- ]+)__/g, (a, b) => "<i>"+b+"</i>")
+          .replace(/\*\*([0-9A-Za-z- ]+)\*\*/g, (a, b) => "<b>"+b+"</b>")
+          .replace(/\-\-([0-9A-Za-z- ]+)\-\-/g, (a, b) => "<u>"+b+"</u>")
+          .trim();
+
+const searchLinks = (query, db, cb) => {
+	return searchDB(query, (db || dbLinks).getAll(), (link, qry, params) => {
+		var nm = link.name.match(new RegExp(qry,'i'));
+		var txt = link.about.match(new RegExp(qry,'i'));
+		var ur = link.url.match(new RegExp(qry,'i'));
+		var r = nm || txt || ur;
+		if(params.user){
+			r = r && link.user == params.user;
+		}
+		link.match = 0;
+		if(cb) cb(params, link);
+		if(nm) link.match = 3;
+		if(txt) link.match++;
+		if(ur) link.match++;
+		return r;
+	});
+};
+
+const searchPosts = (query) => {
+	return searchDB(query, dbPosts.getAll(), (post, qry, params) => {
+		var nm = post.title.match(new RegExp(qry,'i'));
+		var txt = post.content.match(new RegExp(qry,'i'));
+		var r = nm || txt;
+		if(params.tags){
+			var tagsm = post.tags.join(",").match(params.tags);
+			r = r && tagsm;
+		}
+		post.match = 0;
+		if(nm) post.match = 3;
+		if(txt) post.match++;
+		return r ? true : false;
+	}, "title");
+};
+const searchUsers = (query) => {
+	return searchDB(query, usrs.getAll(true), (user, qry, params) => {
+		var nm = user.username.match(new RegExp(qry,'i'));
+		if(user.username == 'server') return false;
+		return nm ? true : false;
+	}, "username");
+};
+const searchFiles = (query) => {
+	if(!dbMods.getAll().length) return [];
+	return searchDB(query, dbMods.getAll(), (file, qry, params) => {
+		if(file.name[0] == '.') return false;
+		var name = file.name.match(new RegExp(qry,'i'));
+		var r = name;
+		if(params.username){
+			var fileuse = file.user.match(params.username);
+			r = r && fileuse;
+		}
+		return r ? true : false;
+	}, "name");
+};
+
+const md5 = str => crypto.createHash("md5").update(str).digest("hex");
+
+var genIDmsg = () => {
+	return md5(uuidV4()+uuidV4()+uuidV4());
+};
+
+var searchImage = (query, cb) => {
+	try{
+	  axios.get('https://api.unsplash.com/search/photos?client_id=mSbEkWVk8FdP55NlScHtRh1avojGBRht1HlbIuFhCWg&query='+query)
+	  .then(function (response) {
+	    cb({original: response.data.results[0].urls.regular});
+	  });
+	} catch(e){
+
+	}
+}
+
+const getAsmoxi = (e, socket) => {
+	var opt = moxi.getpm(null, e);
+	socket.emit('chat:new', opt[0], opt[1]);
+}
+
+const setAvatar = (url, username) => {
+	if(url.length > 500) return false;
+	if(url == 'null'){
+		dbUsers.update((users) => {
+			users.forEach((user) => {
+				if(user.username == username) delete user.avatar;
+			});
+			return users;
+		});
+		return true;
+	}
+	dbUsers.updateWhere({
+		username
+	}, {
+		avatar: url && url != "null" ? url : null
+	});
+	return true;
+}
+
+const getAvatar = (req, res, user, hash) => {
+	var options = {
+    foreground: COLORS.default,
+    background: [24, 22, 34, 255],
+    margin: 0.2,
+    size: 144,
+    format: 'png'
+  };
+
+  if(user && !user.color) user.color = "default";
+
+
+
+  if(user) options.foreground = COLORS[user.color];
+
+	if(req.query.size) options.size = parseInt(req.query.size);
+	if(options.size > 600) options.size = 144;
+	if(req.query.format) options.format = req.query.format;
+	if(req.query.bg) options.background = req.query.bg.split(",");
+	if(req.query.rdc) {
+		options.foreground = [randFrom(0, 255), randFrom(0, 255), randFrom(0, 255), 255];
+		options.background = [randFrom(0, 255), randFrom(0, 255), randFrom(0, 255), 255];
+	};
+
+	var data = new Identicon(hash, options).toString();
+	if(req.query.base64) return res.send(data);
+	var image = Buffer.from(data, 'base64');
+	res.writeHead(200, {
+		'Content-Type': 'image/png',
+		'Content-Length': image.length
+	});
+	res.end(image);	
+}
+
+const chatCmds = {
+	pic(text, msg, socket){
+		try{
+			searchImage(text.trim(),(name) => {
+				var text = "<img src='"+name.original+"' width='100%'/>";
+				moxi.sendmsg(socket, msg, text);
+			});
+		} catch(e) {
+			try{
+				searchImage(text.trim(),(name) => {
+					var text = "<img src='"+name.original+"' width='100%'/>";
+					moxi.sendmsg(socket, msg, text);
+				});
+			} catch(e) {
+				console.log("Failed: "+e);
+			}
+		}
+	},
+	auth(text, msg, socket){
+		if(text == socket.id){
+			socket.chats_auth = true;
+			socket.emit('taguser', socket.username, null, {
+				'title': 'Authenticated',
+				'subtitle': 'You entered SUDO mode!!',
+				'text': 'You can now use commands as /moxi enable'
+			});
+		} else {
+			socket.emit('taguser', socket.username, null, {
+				'title': 'Nope',
+				'subtitle': 'You tried to enter SUDO',
+				'text': 'Was not a success'
+			});
+		}
+	},
+	dump(text, msg, socket){
+		if(text == 'id'){
+			getAsmoxi(socket.id, socket);
+		} else if(text.match(/user ([0-9A-Za-z]+)/)){
+			var id = "";
+			var name = text.split(' ')[1];
+			Object.keys(sessions).forEach(e => {
+				if(sessions[e].username == name){
+					id = sessions[e].id;
+				}
+			});
+			getAsmoxi(id, socket);
+		} else {
+			getAsmoxi('what do you mean?', socket);
+		}
+	},
+	whisper(text, msg, socket){
+		if(!text) return;
+		var args = text.split(" ");
+		var username = args.shift();
+		var mes = args.join(" ");
+		if(!username || !mes.length) return;
+		Object.keys(sessions).forEach(e => {
+			if(sessions[e].username == username){
+				var user = usrs.get(socket.username);
+				msg.text = "Whispered: \n" + mes;
+				sessions[e].emit('chat:new', user, msg);
+
+				socket.emit('taguser', socket.username, null, {
+					'title': 'Whispered',
+					'subtitle': 'Your whisper was heard',
+					'text': 'You whispered something to '+username
+				});
+
+			}
+		});
+	}
+}
+
+chatCmds.pic.broadcast = true;
+
+const chatCmd = (text, a) => {
+	var a = text.replace('/', '').split(' ');
+	if(a[0] in chatCmds){
+		if(chatCmds[a[0]].broadcast) return 'broadcast';
+		else return true;
+	}
+	return false
+}
+
+const getUserFile = (user, name) => {
+	return dbMods.find({ user, name });
+}
+const getAllUserFiles = (user) => {
+	return dbMods.filter({ user });
+}
+const makeNewFile = (user, name, index) => {
+	dbMods.insert({ user, name, index, time: new Date().getTime(), id: uuidV4() });
+}
+
+const chatCmdExec = (text, msg, socket) => {
+	var a = text.replace('/', '').split(' ');
+	var cmd = a.shift();
+	a = a.join(" ");
+	return chatCmds[cmd](a, msg, socket);
+};
+
+var moxi = {
+	get: callMoxi,
+	repliedTo(msg, user){
+		if(msg.reply && msg.reply.to && chdb.get(msg.reply.to)){
+			return chdb.get(msg.reply.to).user.username == user;
+		}
+		return false;
+	},
+	addMessage(socket, username, msg){
+		var all = chdb.getAll();
+		var prev = all[all.length-1];
+		var prev2 = all[all.length-2];
+		if(msg.text[0] == '/' && chatCmd(msg.text) != 'broadcast') return;
+		var user = usrs.get(username);
+		if(!user) return;
+		delete user.password;
+		if(msg.server_response) return;
+    msg.text = makeTextEntry(msg.text);
+    if(msg.text.match(/\@([A-Z0-9-_]+)/ig)){
+    	var a = msg.text.match(/\@([A-Z0-9-_]+)/ig);
+    	socket.broadcast.emit('taguser', a[0].toLowerCase().replace('@',''), username);
+    }
+		msg.id = genIDmsg();
+		if(prev && prev2 && prev.text == "what should i have said?" && moxi.repliedTo(msg, 'server')){
+			moxidata.set(prev2.text, msg.text);
+		}
+		chdb.save(user, msg);
+		if(msg.reply){
+			msg.reply.text = (chdb.get(msg.reply.to) || {text: "none"}).text;
+		}
+		if(!msg.time) msg.time = new Date().getTime();
+		if(socket.broadcast) socket.broadcast.emit('chat:new', user, msg);
+		socket.emit('chat:new', user, msg);
+	},
+	getpm(msg, text){
+		return [{
+			username: "server",
+			color: "aqua"
+		}, {
+			text: text,
+			reply: msg ? {
+				to: msg.id,
+				text: msg.text
+			} : null,
+			id: "server-"+uuidV4()
+		}];
+	},
+	sendmsg(socket, msg, text){
+		var opt = moxi.getpm(msg, text);
+		opt[1].time = new Date().getTime();
+		moxi.addMessage(socket, opt[0] ,opt[1]);
+		chdb.save(opt[0] ,opt[1]);
+		if(socket.broadcast) socket.broadcast.emit('chat:new', opt[0], opt[1]);
+		socket.emit('chat:new', opt[0], opt[1]);
+	}
+}
+
+var checkForCommands = (socket, msg, username) => {
+	if(msg.text[0] == "/"){
+		if(chatCmd(msg.text)){
+			chatCmdExec(msg.text, msg, socket);
+		}
+	} else {
+		if(moxi.repliedTo(msg, 'server') || msg.text.indexOf('@moxi') > -1){
+			var txt = msg.text.replace('@moxi ', '');
+			if(txt.length) moxi.sendmsg(socket, msg, moxi.get(txt));
+		}
+	}
+}
+
+const mdme = (_string, _key, _mode) => {
+  var ledger = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  var epted = '';
+  for(var a in _string){
+    var ln = ledger.length;
+    var s = _string[a];
+
+    if(_mode == 'enc'){
+      var ind = ledger.indexOf(s)+_key;
+    } else {
+      var ind = ledger.indexOf(s)-_key;
+    }
+
+    if(ind >= ln){
+      ind = ind - ln;
+    } else if(ind < 0){
+      ind = ln - ind;
+    }
+    if(ind < 0) ind = ln - ind;
+    var v = ledger[ind];
+    epted = epted + v
+  }
+  return epted;
+}
+
+
+// +++ 
+// + Socket
+// +++
+const wrap = middleware => (socket, next) => middleware(socket.request, {}, next);
+
+io.use(wrap(sessionMiddleware));
+
+io.on('connection', (socket) => {
+
+	var req = socket.request;
+	socket.username = socket.request.session.username || "not_logged_in";
+	socket.broadcast.emit('inned', socket.username);
+
+	console.log("\033[33m@Server: \033[39m"+socket.username+" is online");
+	if(usrs.get(socket.username) && usrs.get(socket.username).banned) {
+		req.session.destroy();
+		console.log("\033[33m@Server: \033[39m"+socket.username+" is banned");
+	}
+
+	sessions[socket.client.id] = (socket);
+
+
+	socket.on('chat:new', (username, msg) => {
+		moxi.addMessage(socket, username, msg);
+		checkForCommands(socket, msg, username);
+	});
+
+	socket.on('inboxuser', (from, to, msg) => {
+		var db = con.db('inboxes');
+		if(msg.text == '/clear'){
+			con.db('inboxes').update(e => {
+				var data = [];
+				data = e.filter(s => s.inbox != to);
+				return data;
+			});
+			return;
+		}
+		var _msg = msg;
+		var user = usrs.get(from);
+		var user2 = usrs.get(to);
+		if(!user || !user2) return;
+		delete user.password;
+		delete user2.password;
+		if(!to) return;
+		_msg.text = makeTextEntry(msg.text);
+		if(!_msg.time) _msg.time = new Date().getTime();
+		_msg.id = genIDmsg();
+		var tm = chdb.save(user, _msg, db, {
+			'inbox': to,
+			'from': from
+		});
+		socket.emit('inboxed:'+to, user, tm || _msg);
+		socket.broadcast.emit('inboxed:'+to, user, tm || _msg);
+	});
+
+	socket.on('typing', username => {
+		socket.broadcast.emit('typing', username);
+	});
+
+	socket.on('event', (event, data) => {
+		socket.broadcast.emit('event:'+event, data);
+	});
+
+	socket.on('disconnect', () => {
+		delete sessions[socket.client.id];
+  	console.log("\033[33m@Server: \033[39m"+socket.username+" is offline");
+		socket.broadcast.emit('outed', socket.username);
+  });
+
+});
+
+// +++ 
+// + Server
+// +++
+app.use("*", (req, res, next) => {
+	if(req.session.admin) return next();
+	var ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+	console.log("\033[33m@Server: \033[39m"+ip+" requested "+req.baseUrl);
+	if(req.session.username){
+		if(usrs.get(req.session.username)){
+			if(usrs.get(req.session.username).banned) {
+				req.session.destroy();
+			}
+		}
+	}
+	next();
+});
+
+app.get("/isloggedin", (req, res) => {
+	var isit = req.session.username  && usrs.get(req.session.username);
+	res.send(isit ? 'yes' : 'no');
+});
+
+app.get("/colors", (req, res) => {
+	var cols = {};
+	for(var i in COLORS){
+		cols[i] = {
+			rgb: COLORS[i],
+			hex: COLORS[i]._h
+		}
+	}
+	res.send(cols);
+});
+
+app.get("/logindata", (req, res) => {
+	res.send(req.session.username || 'not_logged_in');
+});
+
+app.post("/login", (req, res) => {
+	if(Object.keys(req.body).length > 0) req.query = req.body;
+	var uname = req.query.username;
+	if(uname == "server") return res.send('err');
+	uname = uname.toLowerCase().replace(/\ /i,"");
+	var pwd = req.query.password;
+	if(usrs.get(uname)){
+		var usr = usrs.get(uname);
+		if(md5(pwd) == usr.password && !usr.banned){
+			req.session.username = uname;
+			res.send("suc");
+		} else {
+			res.send("err");
+		}
+	} else {
+		usrs.register(uname, pwd);
+		req.session.username = uname;
+		res.send("suc");
+	}
+});
+
+app.use("/logout", (req, res) => {
+	req.session.destroy();
+	res.send('done');
+});
+
+app.get('/kicked', (req, res)=>{
+	req.session.destroy();
+	res.send('you have been kicked...'
+		+(req.query.message ? "because "+req.query.message : "")+
+	'<br> please click <a href="/">here</a> to go back to the home page');
+});
+
+app.use('/api/*', (req, res, next) => {
+	if(!req.header('key') || req.header('key') != process.env._API_KEY){
+		res.status(401);
+		return res.send({'err': 'not_authorized'});
+	}
+	next();
+});
+
+app.post("/api/rayous/postComment", (req, res) => {
+	var post = getPost(req.body.id);
+	var c = post.comments;
+	c.push([req.body.user, makeTextEntry(req.body.comment), new Date().toLocaleString()]);
+
+	if(req.body.comment.match(/\@([A-Z0-9-_]+)/ig)){
+  	var a = req.body.comment.replace(/\@([A-Z0-9-_]+)/ig, (a, b) => {
+			io.local.emit('taguser', b.toLowerCase(), req.body.user, req.body.user + ' mentioned you in a comment at '+post.id);
+  	});
+  }
+
+  if(req.body.comment.match(/\/vote -\:(.+)/)){
+  	var vals = req.body.comment.match(/\/vote -\:(.+)/)[1];
+  	var pollid = vals.split('-')[1];
+  	var val = vals.split('-')[3];
+  	dbPosts.update(function(a){
+			var data = a;
+			data = data.filter(function(dis){
+				if(dis.id == req.body.id){
+					if(!dis.polls) {
+						dis.polls = {};
+					}
+					if(!dis.polls[pollid]){
+						dis.polls[pollid] = {};
+					}
+					if(!dis.polls[pollid][vals]){
+						dis.polls[pollid][vals] = [];
+					}
+					Object.keys(dis.polls[pollid]).forEach(opt => {
+						dis.polls[pollid][opt] = dis.polls[pollid][opt].filter(usr => usr != req.body.user);
+					});
+					if(dis.polls[pollid][vals].find(usr => usr == req.body.user)) dis.polls[pollid][vals] = dis.polls[pollid][vals].filter(usr => usr != req.body.user);
+					else dis.polls[pollid][vals].push(req.body.user);
+				}
+				return dis;
+			});
+			return data;
+		});
+  	return res.send(c);
+  }
+  if(req.body.comment.match(/\/react -\:(.+)/)){
+  	var val = req.body.comment.match(/\/react -\:(.+)/)[1];
+  	if(!val || val.length > 10) return res.send(c);
+  	var reactions = post.reactions;
+  	if(!reactions[val]) reactions[val] = [];
+  	if(reactions[val].find(s => s == req.body.user)) reactions[val] = reactions[val].filter(s => s != req.body.user);
+  	else reactions[val].push(req.body.user);
+  	Object.keys(reactions).forEach(emp => {
+  		if(emp == val) return;
+  		reactions[emp] = reactions[emp].filter(s => s != req.body.user);
+  	});
+  	dbPosts.updateWhere({
+  		id: post.id
+  	}, {
+  		reactions: reactions
+  	});
+  	return res.send(c);
+  }
+
+	dbPosts.update(function(a){
+		var data = a;
+		data = data.filter(function(dis){
+			if(dis.id == req.body.id) dis.comments = c;
+			return dis;
+		});
+		return data;
+	});
+	res.send(c);
+});
+
+app.post("/api/setabout", (req, res) => {
+	if(!req.session.username) return res.send('err1');
+	if(!req.query.about) return res.send('err2');
+	var uname = req.session.username;
+	if(req.query.about.length > 150) return res.send('err3');
+	dbUsers.updateWhere({
+		username: uname
+	}, {
+		about: makeTextEntry(req.query.about)
+	});
+	res.send('done');
+});
+
+app.post("/api/changepwd", (req, res) => {
+	var uname = req.query.username;
+	var cur = req.query.current;
+	var nw = req.query.new;
+	var user = dbUsers.find({ username: uname });
+	if(req.session.username != uname) return res.send('err');
+	if(!user) return res.send('err');
+	if(md5(cur) != user.password) return res.send('err');
+	dbUsers.updateWhere({
+		username: uname
+	}, {
+		password: md5(nw)
+	});
+	res.send('done');
+});
+
+app.post("/api/chkpwd", (req, res) => {
+	var uname = req.query.username || req.session.username;
+	var pwd = req.query.pwd;
+	var user = dbUsers.find({ username: uname });
+	if(md5(pwd) == user.password) return res.send('true');
+	res.send('false');
+});
+
+app.post("/api/addLink", (req, res) => {
+	var uname = req.session.username || "";
+	var name = req.query.name;
+	var about = req.query.about;
+	var url = req.query.url;
+
+	if(!uname || !name || !about || !url) return res.send("err");
+
+	var link = addLink(url,about,name,usrs.get(uname));
+
+	res.send(link ? "suc" : "err");
+});
+
+app.post("/api/lrn/addLink", (req, res) => {
+	if(req.body) req.query = req.body;
+	var uname = req.session.username || "";
+	var name = req.query.name;
+	var about = req.query.about;
+	var category = req.query.category;
+	var url = req.query.url;
+
+	if(!uname || !name || !about || !category || !url) return res.send("err");
+
+	var link = LRN.insert(url,category,about,name,usrs.get(uname));
+
+	res.send(link ? "suc" : "err");
+});
+
+app.post("/api/removeLink", (req, res) => {
+	var link = getLink(req.query.id);
+	if(!link) return res.send("404");
+	if(req.session.username == link.user){
+		removeLink(req.query.id);
+		res.send("200");
+	} else {
+		res.send("401");
+	}
+});
+
+app.get("/api/file/:name", (req, res) => {
+	var file = getUserFile(req.query.username || req.session.username, req.params.name);
+	if(file && file.name[0] == '.' && req.session.username != file.user) file = "";
+	res.send(file);
+});
+
+app.get("/api/files/:user", (req, res) => {
+	res.send(getAllUserFiles(req.params.user));
+});
+
+app.post("/api/file-post", (req, res) => {
+	var user = req.session.username || req.query.user;
+	var name = req.body.name;
+	if(name.length > 30) name = name.substr(0, 30);
+	var index = req.body.index;
+	if(index.length > 3000) index = index.substr(0, 3000);
+	if(getAllUserFiles(user).length > 10) return res.send('err');
+	if(getUserFile(user, name)) return res.send('err');
+	makeNewFile(user, name, index);
+	res.send('yes');
+});
+
+app.post("/api/file-edit", (req, res) => {
+	var user = req.body.user;
+	var name = req.body.name;
+	if(name.length > 30) name = name.substr(0, 30);
+	var index = req.body.index;
+	if(index.length > 3000) index = index.substr(0, 3000);
+	dbMods.updateWhere({ user, name }, { index });
+	res.send('yes');
+});
+
+app.post("/api/removeFile", (req, res) => {
+	dbMods.update(function(a){
+		return a.filter(e => {
+			if(e.name == req.query.id && req.session.username == e.user){
+			} else {
+				return e;
+			}
+		});
+	});
+	res.send('200');
+});
+
+app.get("/api/posttags", (req, res) => {
+	var posts = dbPosts.getAll();
+	var tags = {};
+	posts.forEach(post => {
+		post.tags.forEach(i => {
+			tags[i] = true;
+		});
+	});
+	res.send(Object.keys(tags));
+});
+
+app.post("/api/edit", (req, res) => {
+	var type = req.query.type;
+	var data = req.body;
+	res.send(sendEditMode(type, data).toString());
+});
+
+app.post("/api/avatar/:username", (req, res) => {
+	var url = req.body.url;
+	var username = req.params.username;
+	if(req.session.username == username){
+		res.send(setAvatar(url, username) ? '200' : '500');
+	} else {
+		res.send('401');
+	}
+});
+
+app.post("/api/rayous/removePost", (req, res) => {
+	if(!req.body.id) req.body.id = req.query.id;
+	var link = getPost(req.body.id);
+	if(!link) return res.send("404");
+	if(req.session.username == link.user){
+		removePost(req.query.id);
+		res.send("200");
+	} else {
+		res.send("401");
+	}
+});
+
+app.use("/api/searchlink", (req, res) => {
+	var results = searchLinks(req.query.q);
+
+	res.send(results.length ? results : "nope");
+});
+
+app.use("/api/searchlrn", (req, res) => {
+	var results = searchLinks(req.query.q, LRN, (params, link) => {
+		if(params.category){
+			if(link.about.match('LRN:'+params.category)) link.match++;
+		}
+	});
+
+	res.send(results.length ? results : "nope");
+});
+
+app.use("/api/srp", (req, res) => {
+	var results = searchPosts(req.query.q);
+
+	res.send(results.length ? results : "nope");
+});
+
+app.use("/api/searchusers", (req, res) => {
+	var results = searchUsers(req.query.q);
+
+	res.send(results.length ? results : "nope");
+});
+
+app.use("/api/searchfiles", (req, res) => {
+	var results = searchFiles(req.query.q);
+
+	res.send(results.length ? results : "nope");
+});
+
+app.use("/api/chats", (req, res) => {
+	var results = chdb.getAll();
+
+	res.send(results.length ? results : "nope");
+});
+
+app.use("/api/inbox/:user", (req, res) => {
+	var usr = req.params.user;
+	var inboxes = con.db('inboxes').getAll();
+	var inbox = inboxes.filter(s => {
+		return s.inbox == usr;
+	});
+	res.send(inbox);
+});
+
+app.use("/api/links/new", (req, res) => {
+	var links = dbLinks.getAll().reverse();
+	var tosend = getPaginated(links, req.query.page);
+	res.send(tosend);
+});
+
+app.use("/api/getpagination/links", (req, res) => {
+	res.send(Math.floor(dbLinks.getAll().length / 24).toString());
+});
+
+app.use("/api/getpagination/lrn", (req, res) => {
+	res.send(Math.floor(LRN.getAll().length / 24).toString());
+});
+
+app.use("/api/links", (req, res) => {
+	res.send(dbLinks.getAll());
+});
+
+app.use("/api/lrn/links/new", (req, res) => {
+	var links = LRN.getAll().reverse();
+	var tosend = getPaginated(links, req.query.page);
+	res.send(tosend);
+});
+app.use("/api/lrn/links", (req, res) => {
+	res.send(LRN.getAll());
+});
+
+app.use("/api/rposts/new", (req, res) => {
+	var posts = dbPosts.getAll().reverse();
+	var tosend = [pickRandom(...posts)];
+	if(req.query.tags) {
+		var tags = Array.isArray(req.query.tags) ? req.query.tags : req.query.tags.match(",") ? req.query.tags.split(",") : [req.query.tags];
+		var filtered = posts.filter(i => {
+			var _tags = i.tags;
+			var matched = [];
+			tags.forEach(i => {
+				if(_tags.find(e => i == e)) matched.push(i);
+			});
+			return matched.length;
+		});
+		filtered = [pickRandom(...filtered)];
+		if(req.query.i) return res.send(filtered);
+		filtered.unshift(pickRandom(...posts.filter(i => {
+			var _tags = i.tags;
+			var matched = [];
+			tags.forEach(i => {
+				if(_tags.find(e => i == e)) matched.push(i);
+			});
+			return i.id != filtered[0].id && matched.length;
+		})));
+		return res.send(filtered);
+	} else {
+		if(req.query.i) return res.send(tosend);
+		tosend.unshift(pickRandom(...posts.filter(i => i.id != tosend[0].id)));
+	}
+	// var length = links.length;
+	// if(length > 24) length = 24;
+	// for (var i = 0; i < length; i++) {
+		// tosend.push(links[i]);
+	// }
+	res.send(tosend);
+});
+
+
+app.get("/avatar/:id", (req, res) => {
+	var user = dbUsers.find({username: req.params.id});
+	var hash = md5(req.params.id);
+
+	if(user && user.avatar){
+  	var requestSettings = {
+      url: user.avatar,
+      method: 'GET',
+      encoding: null
+    };
+
+    request(requestSettings, function(error, response, body) {
+      if(response.headers['content-type'].match('image')){
+  			res.set('Content-Type', 'image/png');
+      	res.send(body);
+  		} else {
+  			getAvatar(req, res, user, hash);
+  		}
+    });
+  } else {
+  	getAvatar(req, res, user, hash);
+  }
+});
+
+app.use("/api/rposts", (req, res) => {
+	res.send(dbPosts.getAll());
+});
+
+app.use("/api/link/:id", (req, res) => {
+	res.send(dbLinks.find({id: req.params.id}));
+});
+
+app.post("/api/linkmode/:id", (req, res) => {
+	var mode = req.query.mode;
+	if(!mode) return res.send('err');
+	var id = req.params.id;
+	var link = getLink(id);
+	if(!link) return res.send('err');
+	updateLinkMode(id, mode);
+	res.send('done');
+});
+
+app.use("/api/post/:id", (req, res) => {
+	res.send(dbPosts.find({id: req.params.id}));
+});
+
+app.use("/api/users", (req, res) => {
+	var users = usrs.getAll();
+	var names = [];
+	if(req.query.sort){
+		if(req.query.sort == 'lrn') users = users.reverse().sort((a, b) => {
+			var f = a.links;
+			var g = b.links;
+			var c = 0;
+			var d = 0;
+			f.forEach((item, i) => {
+				if(getLink(item).about.match(/\@\[\[LRN\:(.+)\]\]/)) c++;
+			});
+			g.forEach((item, i) => {
+				if(getLink(item).about.match(/\@\[\[LRN\:(.+)\]\]/)) d++;
+			});
+			return d - c;
+		});
+		if(req.query.sort == 'links') users = users.sort((a, b) => {
+			var f = a.links.length;
+			var g = b.links.length;
+			return g - f;
+		});
+		if(req.query.sort == 'posts') users = users.sort((a, b) => {
+			var f = a.posts.length;
+			var g = b.posts.length;
+			return g - f;
+		});
+	}
+	users.forEach((item, i) => {
+		names.push(item.username);
+	});
+	res.send(names);
+});
+
+app.post("/api/user/:username/settings", (req, res) => {
+	if(Object.keys(req.body).length && !Object.keys(req.query).length) req.query = req.body;
+	var color = req.query.color;
+	var username = req.params.username;
+	var usr = usrs.get(req.params.username);
+	var settings = usr.settings;
+	Object.keys(req.query).forEach(e => {
+		var a = req.query[e];
+		req.query[e.replace(/\[/g,'').replace(/\]/g,'')] = a;
+		//delete req.query[e];
+	});
+	if(Object.keys(req.query).length > 0 && !color){
+		settings[Object.keys(req.query)[0]] = req.query[Object.keys(req.query)[0]];
+		if(req.query.favs){
+			settings.favs = Array.isArray(req.query.favs) ? req.query.favs : req.query.favs.match ? (req.query.favs.match(",") ? req.query.favs.split(",") : [req.query.favs]) : req.query.favs;
+		}
+		if(req.query.tags){
+			if(req.query.tags == "remove") settings.tags = [];
+			settings.tags = Array.isArray(req.query.tags) ? req.query.tags : req.query.tags.match(",") ? req.query.tags.split(",") : [req.query.tags];
+			if(settings.tags == "remove" || settings.tags[0] == "remove") settings.tags = [];
+		}
+		// dbUsers.update({
+		// 	username: username
+		// },{
+		// 	settings: settings
+		// });
+		usrs.setSettings(username, settings);
+		return res.send('ok');
+	}
+	if(!color) return res.send('what');
+	dbUsers.updateWhere({
+		username: username
+	},{
+		color: color
+	});
+	res.send('ok');
+});
+
+app.use("/api/user/:username", (req, res) => {
+	var usr = usrs.get(req.params.username);
+	if(usr) delete usr.password;
+	var links = [];
+
+	(usr || {links:[]}).links.forEach((item, i) => {
+		links.push(getLink(item));
+	});
+
+	if(usr) usr.links = links;
+
+	res.send(usr || "nope");
+});
+
+app.post("/api/rayous/addPost", (req, res) => {
+	var uname = req.session.username || "";
+	var title = req.body.title;
+	var content = req.body.content;
+	var tags = req.body.tags;
+
+	if(!uname) return res.send('nope');
+	if(!tags) return res.send('nope');
+	if(!title) return res.send('nope');
+	if(!content) return res.send('nope');
+
+	var link = addPost(title, content.replace(/<(\/|)(script|style|link|html|body|head|title)/g, (a, b, c) => "&lt;"+b+c), uname, tags);
+
+	res.send(link ? link.id : "err");
+});
+
+app.post("/api/contact/post", (req, res) => {
+	var name = req.body.user || req.query.user;
+	var content = req.body.content || req.query.content;
+	var type = (req.body.type || req.query.type) ? "to" : "from";
+	if(!name || !content || name.length > 300) return res.send('err');
+	con.db('contact').insert({
+		"name": name.toLowerCase(),
+		"date": new Date().getTime(),
+		"type": type || "from",
+		"content": makeTextEntry(content)
+	});
+	var ans = callMoxi(makeTextEntry(content));
+	if(ans && !ans.match(/... (i dont get it|...that didn't make sense)/)){
+		con.db('contact').insert({
+      "name": name.toLowerCase(),
+      "date": new Date().getTime(),
+      "content": "[Robot] "+ans,
+      "type": "to"
+    });
+	}
+	res.send('probably_worked');
+});
+
+app.use("/api/contact/get/:user", (req, res) => {
+	var name = req.params.user;
+	var co = con.db('contact').getAll().filter(e => e.name.toLowerCase() == name.toLowerCase());
+	res.send(co);
+});
+
+app.use("/api/isonline/:username", (req, res) => {
+	var name = req.params.username;
+	var yes = false;
+	Object.keys(sessions).forEach(e => {
+		if(sessions[e].username == name) yes = true;
+	});
+	res.send(yes);
+});
+
+app.use("/api/sessions", (req, res) => {
+	var sen = [];
+	var loaded = 0;
+	Object.keys(sessions).forEach(e => {
+		if(req.query.r && loaded > Number(req.query.r)) return;
+		sen.push({id: sessions[e].client.id, user: req.query.a ? usrs.get(sessions[e].username, true) : sessions[e].username});
+		loaded++;
+	});
+	res.send(sen);
+});
+
+app.use('/l/:id', (req, res) => {
+	var id = req.params.id;
+	var link = getLink(id);
+	if(!link) return res.send('link_not_found');
+	if(link.mode == 'redirect'){
+		return res.redirect(link.url);
+	}
+	if(link.mode == 'view'){
+		var html = fs.readFileSync(path.join(__dirname, "app/standalone/views/viewlink.html")).toString();
+		html = html.replace(/\@([A-Za-z0-9]+)/g, (a, b) => {
+			return link[b] || a;
+		});
+		return res.send(html);
+	}
+	res.send('link isn\'t set to viewable mode');
+});
+
+var startx = adminPage(app, usrs, chdb, moxi, removeLink, removePost, sessions, io, {
+	links: dbLinks,
+	users: dbUsers,
+	chats: dbChats,
+	posts: dbPosts,
+	con: con,
+}, input, addPost, addLink);
+
+app.use('/api', (req, res) => {
+	res.send({'err': 'no_query_found'});
+});
+
+
+app.use("/changelog", (req, res) => {
+	var html = fs.readFileSync(path.join(__dirname, ".changelog")).toString();
+	html = html.replace(/# (.+)/g, (a, b) => {
+		return "<h2>"+b+"</h2>";
+	}).replace(/\+ (.+)/g, (a, b) => {
+		return "<p>"+b+"</p>";
+	});
+	res.send('<link href="/docs/static/css/index.css" rel="stylesheet"> \n'+html);
+});
+
+app.use('/', express.static(path.join(__dirname, 'app/homepage')));
+app.get("/favicon.ico", (req, res) => {
+	res.sendFile(path.join(__dirname, "logo/logo.png"));
+});
+app.use('/libs', express.static(path.join(__dirname, 'app/libs')));
+
+const appView = (name, app) => {
+	return path.join(__dirname, 'app', app ,'views', name);
+}
+
+const getIfLoggedIn = (req) => {
+	var user = req.session.username ? dbUsers.find({
+		username: req.session.username || ""
+	}) : null;
+	if(user) user.logged_in = true;
+	if(user && !user.settings.theme){
+		if(!user.settings) user.settings = {}
+		user.settings.theme = 'dark';
+	}
+	return user || {
+		username: "user",
+		logged_in: false,
+		time: new Date().getTime(),
+		color: "default",
+		settings: {
+			'theme': 'dark'
+		}
+	}
+};
+
+const checkBrowserVersion = (req, res) => {
+	var ua = req.header('User-Agent') || req.header('user-agent');
+	try{
+		var M= ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
+	  if(/trident/i.test(M[1])){
+	      tem=  /\brv[ :]+(\d+)/g.exec(ua) || [];
+	      return 'IE '+(tem[1] || '');
+	  }
+	  if(M[1]=== 'Chrome'){
+	      tem= ua.match(/\b(OPR|Edge)\/(\d+)/);
+	      if(tem!= null) return tem.slice(1).join(' ').replace('OPR', 'Opera');
+	  }
+	  M= M[2]? [M[1], M[2]]: ['', 0, '-?'];
+	  if((tem= ua.match(/version\/(\d+)/i))!= null) M.splice(1, 1, tem[1]);
+	  var b = M.join(' ');
+	  if(
+	  	(M[0] == 'Chrome' && Number(M[1]) < 51) ||
+	  	(M[0] == 'Edge' && Number(M[1]) < 14) ||
+	  	(M[0] == 'Opera' && Number(M[1]) < 48) ||
+	  	(M[0] == 'Safari' && Number(M[1]) < 10) ||
+	  	(M[0] == 'Firefox' && Number(M[1]) < 52) ||
+	  	(M[0] != 'Chrome' && M[0] != 'Safari' && M[0] != 'Edge' && M[0] != 'Firefox' && M[0] != 'Opera')
+	  ){
+	  	res.send('Your browser "'+b+'" is either old or an unsupported browser');
+	  	return true;
+	  } else {
+	  	return false;
+	  }
+	} catch(e){
+		return false;
+	}
+}
+
+app.set('view engine', 'ejs');
+app.get(['/linque', '/linque/', '/linque/:page', '/linque/:page/:attr'], (req, res)=>{
+	if(checkBrowserVersion(req, res)) return;
+	var ur = (function(){
+		var d = req.url.split("/");
+		return d[d.length-1].split(".")[0];
+	})()
+
+	res.render(appView('index','linque'), {
+		user: getIfLoggedIn(req),
+		page: req.url.replace(/.+\/linque\//,"")
+	});
+});
+
+app.get(['/rayous', '/rayous/', '/rayous/:page', '/rayous/:page/:attr'], (req, res)=>{
+	if(checkBrowserVersion(req, res)) return;
+	var ur = (function(){
+		var d = req.url.split("/");
+		return d[d.length-1].split(".")[0];
+	})()
+
+	res.render(appView('index','rayous'), {
+		user: getIfLoggedIn(req),
+		page: req.url.replace(/.+\/rayous\//,"")
+	});
+});
+
+app.get(['/lrn', '/lrn/', '/lrn/:page', '/lrn/:page/:attr', '/lrn/:page/:attr/:attr', '/lrn/:page/:attr/:attr/:attr'], (req, res)=>{
+	var ur = (function(){
+		var d = req.url.split("/");
+		return d[d.length-1].split(".")[0];
+	})();
+
+	if(checkBrowserVersion(req, res)) return;
+
+	res.render(appView('index','lrn'), {
+		user: getIfLoggedIn(req),
+		page: req.url.replace(/.+\/lrn\//,"")
+	});
+});
+
+app.get(['/profile', '/profile/:page', '/profile/u/:name'], (req, res)=>{
+	if(checkBrowserVersion(req, res)) return;
+	res.render(appView('profile','standalone'), {
+		user: getIfLoggedIn(req)
+	});
+});
+
+app.get('/users', (req, res)=>{
+	if(checkBrowserVersion(req, res)) return;
+	res.render(appView('u','standalone'), {
+		user: getIfLoggedIn(req)
+	});
+});
+
+app.get(['/term', '/term/:page', '/term/:page/:name'], (req, res)=>{
+	if(checkBrowserVersion(req, res)) return;
+	res.render(appView('term','standalone'), {
+		user: getIfLoggedIn(req)
+	});
+});
+
+app.use('/bg-colored', (req, res) => {
+	var user = { color: 'default' }
+	if(req.query.username || req.session.username){
+		user = usrs.get(req.query.username || req.session.username);
+	}
+	if(!user.color) user.color = "default";
+	res.redirect('/res/bg-'+user.color+".png");
+});
+app.use('/bg', (req, res) => {
+	var d = path.join(__dirname, 'app/homepage/res');
+	var elts = fs.readdirSync(d);
+	elts.forEach(e => elts[e] = 1);
+	if(req.session.username){
+		var user = usrs.get(req.session.username);
+		if(user.settings.bg && user.settings.bg in elts) return res.redirect('/res/'+user.settings.bg);
+	}
+	res.redirect("/res/starfall.gif");
+});
+app.use(['/ask/:username', '/ask'], (req, res)=>{
+	res.render(appView('ask','standalone'), {
+		user: req.params.username
+	});
+});
+
+var starty = appShi({
+	app: app,
+	usrs: usrs,
+	chdb: chdb,
+	moxi: moxi,
+	sessions: sessions,
+	io: io,
+	con: con
+});
+
+app.use((req, res) => {
+	res.status(404);
+	res.sendFile(path.join(__dirname, 'app/standalone/views/404.html'));
+});
+
+// setTimeout(function() {}, 43200000);
+
+server.listen(port, () => {
+	if(hasarg('tg')) tgBot();
+	twirlTimer.clear();
+	console.log("\033[33m@Server: \033[32mServer started \033[35mhttp://[Host: "+host+"]:"+port+"\033]")
+	if(input) startx();
+});

@@ -1,0 +1,86 @@
+{
+	"database": {
+		"user": {
+			"label": "BaseName|name",
+			"@id": "id",
+			"@container": "containerid",
+			"definer": "username|userid",
+			"private": "password",
+			"timestring": "timecode"
+		},
+		"item.post": {
+			"#parent": "posts",
+			"label": "BaseName|name|title",
+			"@id": "id",
+			"@container": "containerid",
+			"@dataContainer": "/n dataContainer|dataid",
+			"content": "text|content",
+			"timestring": "timecode",
+			"tags": "tags",
+			"type": "type",
+			"descriptor": "about",
+			"specialChar": "url|char|finer"
+		},
+		"item.file": {
+			"#parent": "files",
+			"@id": "id",
+			"@container": "containerid",
+			"content": "text|content",
+			"timestring": "timecode",
+			"definer": "name"
+		},
+		"item.post.comment": {
+			"#parent": "comments",
+			"@id": "id",
+			"@container": "containerid",
+			"@responsible": "username",
+			"content": "text|content",
+			"timestring": "timecode",
+		},
+		"item.post.reaction": {
+			"#parent": "reactions",
+			"@id": "id",
+			"@container": "containerid",
+			"@responsible": "username",
+			"content": "text|content",
+			"timestring": "timecode",
+		},
+		"item.message": {
+			"#parent": "chats",
+			"@id": "id",
+			"@container": "containerid",
+			"content": "text|content",
+			"timestring": "timecode",
+			"@responsible": "username",
+			"specialChar": "url|char|finer"
+		}
+	}, 
+	"primitive": {
+		"user": {
+			"username": "definer",
+			"name": "label",
+			"time": "timestring",
+			"password": "private",
+			"id": "@id",
+			"containerId": "@container"
+		},
+		"item.post": {
+			"id": "@id",
+			"containerId": "@container",
+			"title": "label",
+			"content": "content",
+			"type": "type",
+			"tags": "tags",
+			"description": "descriptor",
+			"sprop": "specialChar",
+			"time": "timestring"
+		},
+		"item.file": {
+			"id": "@id",
+			"@container": "containerid",
+			"content": "content",
+			"time": "timestring",
+			"name": "definer"
+		},
+	}
+}

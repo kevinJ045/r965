@@ -8,6 +8,7 @@
     "dev": "nodemon -e js -i cilia alia/server.js"
   },
   "keywords": [],
+  "type": "module",
   "author": "bushyice/kevinj045",
   "license": "ISC",
   "dependencies": {
