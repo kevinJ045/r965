@@ -13,7 +13,7 @@
 			"label": "BaseName|name|title",
 			"@id": "id",
 			"@container": "containerid",
-			"@dataContainer": "/n dataContainer|dataid",
+			"@dataContainer": "/ndataContainer|dataid",
 			"content": "text|content",
 			"timestring": "timecode",
 			"tags": "tags",
@@ -35,7 +35,7 @@
 			"@container": "containerid",
 			"@responsible": "username",
 			"content": "text|content",
-			"timestring": "timecode",
+			"timestring": "timecode"
 		},
 		"item.post.reaction": {
 			"#parent": "reactions",
@@ -43,7 +43,7 @@
 			"@container": "containerid",
 			"@responsible": "username",
 			"content": "text|content",
-			"timestring": "timecode",
+			"timestring": "timecode"
 		},
 		"item.message": {
 			"#parent": "chats",
@@ -81,6 +81,6 @@
 			"content": "content",
 			"time": "timestring",
 			"name": "definer"
-		},
+		}
 	}
 }

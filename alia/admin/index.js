@@ -1,0 +1,4 @@
+
+function admin(){}
+
+export { admin }

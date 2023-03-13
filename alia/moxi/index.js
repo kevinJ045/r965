@@ -1,4 +1,4 @@
-import moxiWords from './wordlist';
+import moxiWords from './wordlist.js';
 
 class moxiChatBot {
 
