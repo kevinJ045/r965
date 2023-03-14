@@ -40,7 +40,32 @@ function initApp(){
 	    name: 'Cilia',
 	    theme: 'md',
 	    id: 'com.esvigd.cilia',
-	    routes: ROUTES
+	    routes: ROUTES,
+	    view: {
+	    	browserHistory: true,
+	        browserHistorySeparator: '',
+	        browserHistoryRoot: location.origin
+	    },
+	    on: {
+	    	pageAfterIn(e){
+	    		var el = $(e.pageEl);
+	    		var $title = el.find('.ml6 .letters');
+				$title.each(function(){
+					var $ths = $(this);
+					$ths.html($ths.text()
+						.replace(/\S/g, '<span class="letter">$&</span>')
+						.replace(/<span class="letter">%<\/span><span class="letter">([0-9])<\/span>([\s\S]+)<span class="letter">%<\/span>/g, "<b b$1>$2</b>"));
+				});
+				anime.timeline()
+				  .add({
+				    targets: '.ml6 .letter',
+				    translateY: ["1.1em", 0],
+				    translateZ: 0,
+				    duration: 750,
+				    delay: (el, i) => 20 * i
+				  });
+	    	}
+	    }
 	});
 
 	window.app = app;

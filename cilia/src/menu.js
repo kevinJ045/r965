@@ -76,6 +76,7 @@ function initMenu(app, viewEl){
     menu.add(newMenuListItem(item.icon, item.title, item.func));
   });
 
+  app._mainpanel = panel;
 }
 
 export default initMenu;

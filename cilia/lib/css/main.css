@@ -364,6 +364,12 @@ img{
 .main-panel{
 	height: 95vh;
 	margin: 2.5vh 25px;
+	transition: .3s;
+}
+
+.main-panel.margin-top{
+	height: calc(95vh - 60px);
+	margin-top: calc(2.5vh + 60px) !important;
 }
 
 .page:not(.page-bar) .page-content, .main-panel{
@@ -526,10 +532,31 @@ b[a]{
 	color: var(--theme-accent);
 }
 
-b[b]{
+b[b1]{
 	color: var(--theme-accent);
 }
 
+b[b1]:after{
+	width: 70%;
+	background: var(--theme-accent);
+	content: "";
+	display: block;
+	height: 2px;
+	border-radius: 2px;
+	position: absolute;
+	bottom: 0px;
+	right: 0;
+	animation: widen 1s 1;
+}
+
+@keyframes widen{
+	0%{
+		width: 1px;
+	}
+	100%{
+		width: 70%;
+	}
+}
 
 .block-strong:before,
 .block-strong:after{
