@@ -6,6 +6,7 @@
 			"@container": "containerid",
 			"definer": "username|userid",
 			"private": "password",
+			"@options": { "preferredColor": "default" },
 			"timestring": "timecode"
 		},
 		"item.post": {
@@ -62,7 +63,8 @@
 			"time": "timestring",
 			"password": "private",
 			"id": "@id",
-			"containerId": "@container"
+			"containerId": "@container",
+			"settings": "@options"
 		},
 		"item.post": {
 			"id": "@id",
@@ -77,10 +79,32 @@
 		},
 		"item.file": {
 			"id": "@id",
-			"@container": "containerid",
+			"containerId": "@container",
 			"content": "content",
 			"time": "timestring",
 			"name": "definer"
+		},
+		"item.post.comment": {
+			"id": "@id",
+			"containerId": "@container",
+			"username": "@responsible",
+			"content": "content",
+			"time": "timestring"
+		},
+		"item.post.reaction": {
+			"id": "@id",
+			"containerId": "@container",
+			"username": "@responsible",
+			"content": "content",
+			"time": "timestring"
+		},
+		"item.message": {
+			"id": "@id",
+			"containerId": "@container",
+			"username": "@responsible",
+			"content": "content",
+			"time": "timestring",
+			"special": "specialChar"
 		}
 	}
 }

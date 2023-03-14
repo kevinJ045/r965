@@ -48,6 +48,11 @@ class Manager {
 		return user ? modelToPrimitive(user, 'user') : null;
 	}
 
+	async getUserByContainerID(cid) {
+		var user = await db.collection('users').findOne({ '@container': cid });
+		return user ? modelToPrimitive(user, 'user') : null;
+	}
+
 	async getAllUsers(){
 		return makePrimitive(await db.collection('users').find({}).toArray(), 'user');
 	}
@@ -76,6 +81,13 @@ class Manager {
 			else if(property == 'files') prop = makePrimitive(await db.collection('files').find({ '@container': cid }).toArray(), 'item.file');
 		}
 		return prop;
+	}
+
+	async setUserProp(username, props){
+		return db.collection('users').updateMany(
+	       { 'definer': username },
+	       { $set: props }
+	   	);
 	}
 
 	/*
@@ -124,6 +136,12 @@ class Manager {
 
 	async userGetFile(id){
 		var file = await db.collection('files').findOne({ '@id': id });
+		return file ? modelToPrimitive(file, 'item.file') : null;
+	}
+
+	async getUserFile(cid, id){
+		console.log(cid, id)
+		var file = await db.collection('files').findOne({ '@container': cid, '@id': id });
 		return file ? modelToPrimitive(file, 'item.file') : null;
 	}
 

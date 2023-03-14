@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html class="theme-<%= user.color %>">
+<head>
+	
+	<meta charset="utf-8">
+	<meta name="format-detection" content="telephone=no">
+	<meta name="msapplication-tap-highlight" content="no">
+	<meta name="theme-color" content="#141526">
+	<meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
+	<meta name="color-scheme" content="light dark">
+
+	<title>Esvigd</title>
+
+	<link rel="stylesheet" href="/app/lib/css/framework7.css">
+	<link rel="stylesheet" href="/app/lib/css/main.css">
+
+
+	<link rel="stylesheet" href="/app/lib/css/fonts.css">
+
+
+    <script>
+        window.USER = {
+        	<%
+				for(var i in user){
+					%>"<%=i%>": "<%=user[i]%>",<%
+				}
+			%>
+        }
+        window.USER.loggedin = window.USER.username.length > 0;
+    </script>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5814222897591626"
+     crossorigin="anonymous"></script> -->
+
+     <script type="application/ld+json">
+	    {
+	      "@context" : "https://schema.org",
+	      "@type" : "WebSite",
+	      "name" : "Rayous",
+	      "url" : "https://r921.onrender.com/rayous/"
+	    }
+	</script>
+</head>
+<body class="dark blue-sky blur">
+
+
+	<div class="bg-img"></div>
+
+
+	<app id="app-root"></app>
+
+	<script src="/app/lib/js/jquery.js"></script>
+	<script src="/app/lib/js/jq.other.js"></script>
+	<script src="/app/lib/js/framework7.js"></script>
+	<script src="/app/lib/js/at.js" @provide="@all"></script>
+	<script src="/app/lib/js/main.js"></script>
+</body>
+</html>

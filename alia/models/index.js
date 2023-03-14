@@ -9,6 +9,10 @@ function model(object, type, parent){
 			// modelFormatted.__parent = modelOriginal[i];
 			continue;
 		}
+		if(typeof modelOriginal[i] == "object") {
+			modelFormatted[i] = modelOriginal[i];
+			continue;
+		}
 		var val = object[modelOriginal[i]];
 		var setnull = false;
 		if(!val) {

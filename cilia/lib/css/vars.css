@@ -1,0 +1,94 @@
+:root{
+  --theme: #cba6f7;
+  --theme-accent: var(--theme);
+  --theme-accent-alter: #3D2259;
+  --theme-rgb: 133, 59, 206;
+  --theme-accent-rgb: 133, 59, 206;
+  --theme-accent-rgba: rgba(133, 59, 206, 0.4);
+  --theme-color: #181622;
+  --theme-color-dark: #13111C;
+  --theme-color-2-dark: #211F2D;
+  --theme-color-2: #211F2D;
+  --theme-color-accent: #853BCE;
+}
+
+body, :root, #app{
+  --f7-theme-color: var(--theme-accent);
+  --f7-preloader-color: var(--theme-accent);
+  --f7-theme-color-rgb: var(--theme-accent-rgb);
+  --f7-theme-color-shade: var(--theme-accent-dark);
+  --f7-theme-color-tint: var(--theme-accent-tint);
+  --f7-sheet-bg-color: var(--theme-color);
+  --f7-page-bg-color: var(--theme-color) !important;
+  --f7-page-content-bg-color: var(--theme-color)  !important;
+  --f7-navbar-margin: 12px !important;
+  --elevaion-cards:  var(--f7-elevation-6);
+  --f7-popover-border-radius: 12px;
+  --f7-list-inset-border-radius: 20px;
+  --f7-popup-tablet-border-radius: 12px;
+  --shadow-a: 0px 0px 4px rgba(0, 0, 0, 0.5);
+  --f7-message-bubble-border-radius: 14px;
+  --f7-preloader-modal-bg-color: transparent;
+  --f7-text-editor-toolbar-bg-color: var(--theme-color-2);
+  --f7-message-received-bg-color: var(--theme-color) !important;
+  --f7-message-sent-bg-color: var(--theme-color) !important;
+  --f7-notification-margin: 10px;
+  --f7-notification-padding: 16px;
+  --f7-notification-border-radius: 14px;
+  --f7-notification-bg-color: var(--theme-color) !important;
+  --f7-searchbar-input-padding-horizontal: 24px !important;
+  --f7-toast-bg-color: var(--theme-color-dark);
+  --f7-navbar-bg-color: var(--theme-color-2);
+  --f7-messagebar-bg-color: var(--theme-color-2) !important;
+  --f7-toolbar-bg-color: var(--theme-color-2) !important;
+  --f7-list-bg-color: var(--theme-color-2-dark) !important;
+  --f7-popover-bg-color: var(--theme-color-2-dark) !important;
+  --f7-timeline-item-inner-bg-color: var(--theme-color-2-dark) !important;
+  --f7-block-strong-bg-color: var(--theme-color-2-dark) !important;
+  --f7-sheet-bg-color: var(--theme-color-2-dark) !important;
+  --f7-dialog-bg-color: var(--theme-color-2-dark) !important;
+  --f7-card-bg-color: var(--theme-color-2-dark) !important;
+  --f7-searchbar-input-bg-color: var(--theme-color-2) !important;
+}
+
+.ptr-preloader,
+.ptr-preloader .preloader{
+  background: var(--f7-page-bg-color) !important;
+  --f7-preloader-color: var(--f7-theme-color);
+}
+
+/* @media only screen and (min-width: 800px){
+  #leftSidePanel .tab{
+    background: var(--f7-page-bg-color) !important;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+
+  #leftSidePanel .toolbar{
+    position: fixed;
+  }
+} */
+
+.navbar, .toolbar.margin{
+  margin: 24px var(--f7-navbar-margin) !important;
+  width: calc(100% - 2 * var(--f7-navbar-margin)) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  -webkit-box-shadow: var(--f7-elevation-6);
+          box-shadow: var(--f7-elevation-6);
+}
+
+.navbar ~ * {
+  --f7-page-navbar-offset: 100px;
+}
+
+.toolbar.margin ~ *{
+  --f7-page-toolbar-bottom-offset: 90px;
+}
+
+
+.menu-list .item-link{
+  margin: 5px var(--f7-menu-list-offset);
+}

@@ -4,8 +4,9 @@
   "description": "",
   "main": "alia/server.js",
   "scripts": {
-    "start": "node alia/server.js",
-    "dev": "nodemon -e js -i cilia alia/server.js"
+    "start": "/opt/node/bin/node alia/server.js",
+    "dev": "nodemon -e js -i cilia --exec \"/opt/node/bin/node alia/server.js\"",
+    "build": "/usr/local/bin/webpack --config webpack.config.js --stats-error-details"
   },
   "keywords": [],
   "type": "module",
