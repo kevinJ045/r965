@@ -23,6 +23,10 @@ const menuItems = [
     title: 'Home',
     icon: 'home',
     func: '/'
+  }, {
+    title: 'Terminal',
+    icon: 'terminal',
+    func: '/shell'
   },
 ];
 

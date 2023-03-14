@@ -3,6 +3,7 @@ import { pickRandom, randFrom } from 'misc/rand.js';
 
 import Home from "./components/home.js";
 import Settings from "./components/settings.js";
+import Terminal from "./components/shell.js";
 
 const components = {};
 components.sub = {};
@@ -95,6 +96,7 @@ components.login = (props, { $f7, $on, $el, $update, $h }) => {
 
 components.home = Home;
 components.settings = Settings;
+components.shell = Terminal;
 
 window.components = components;
 

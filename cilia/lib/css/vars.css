@@ -1,7 +1,7 @@
 :root{
   --theme: #cba6f7;
   --theme-accent: var(--theme);
-  --theme-accent-alter: #3D2259;
+  --theme-accent-alter: #853BCE;
   --theme-rgb: 133, 59, 206;
   --theme-accent-rgb: 133, 59, 206;
   --theme-accent-rgba: rgba(133, 59, 206, 0.4);
@@ -9,7 +9,7 @@
   --theme-color-dark: #13111C;
   --theme-color-2-dark: #211F2D;
   --theme-color-2: #211F2D;
-  --theme-color-accent: #853BCE;
+  --theme-color-accent: #3d324a;
 }
 
 body, :root, #app{

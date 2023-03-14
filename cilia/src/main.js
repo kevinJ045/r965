@@ -47,7 +47,7 @@ function initApp(){
 	        browserHistoryRoot: location.origin
 	    },
 	    on: {
-	    	pageAfterIn(e){
+	    	pageBeforeIn(e){
 	    		var el = $(e.pageEl);
 	    		var $title = el.find('.ml6 .letters');
 				$title.each(function(){
@@ -56,6 +56,8 @@ function initApp(){
 						.replace(/\S/g, '<span class="letter">$&</span>')
 						.replace(/<span class="letter">%<\/span><span class="letter">([0-9])<\/span>([\s\S]+)<span class="letter">%<\/span>/g, "<b b$1>$2</b>"));
 				});
+	    	},
+	    	pageAfterIn(e){
 				anime.timeline()
 				  .add({
 				    targets: '.ml6 .letter',

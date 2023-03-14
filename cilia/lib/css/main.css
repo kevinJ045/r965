@@ -868,6 +868,24 @@ b[b1]:after{
   background: rgba(255, 255, 255, 0.05);
 }
 
+.nav-list .tab-link-active .item-media{
+  color: var(--theme-accent);
+}
+
 .me-tabs .tab{
   animation: fadeInUp .1s 1;
+}
+
+.term {
+  background-color: var(--theme-color);
+  --background: var(--theme-color);
+  --color: var(--theme-accent) !important;
+  --error-color: var(--ctp-mocha-red);
+  width: 100%;
+  height: calc(100% - 50px);
+  position: absolute;
+}
+
+.appbar{
+	background: transparent;
 }

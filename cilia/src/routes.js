@@ -16,6 +16,9 @@ if(!USER.loggedin) {
 		}, {
 			path: '/settings',
 			component: components.settings
+		}, {
+			path: '/shell',
+			component: components.shell
 		}
 	);
 }
