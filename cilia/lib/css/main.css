@@ -889,3 +889,58 @@ b[b1]:after{
 .appbar{
 	background: transparent;
 }
+
+.winbox {
+    background: var(--theme-color-dark);
+    border-radius: 12px;
+    box-shadow: none;
+    z-index: 999 !important;
+}
+
+.wb-body {
+    margin: 4px;
+    color: var(--theme-foreground);
+    background: var(--theme-color-dark);
+}
+
+.wb-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 30px;
+  padding-left: 20px;
+}
+
+.wb-control {
+	float: left;
+  padding-left: 10px;
+}
+
+.wb-control * {
+    opacity: 0.65;
+    width: 15px;
+    height: 15px;
+    border-radius: 25px;
+    transition: .5s;
+    margin: 0 3px;
+}
+
+.wb-control *:hover {
+    opacity: 1;
+}
+
+.wb-min {
+  background: #fab387;
+}
+
+.wb-max {
+  background: #a6e3a1;
+}
+
+.wb-close {
+	background: #f38ba8;
+}
+
+.wb-full {
+    display: none;
+}

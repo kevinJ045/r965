@@ -10,6 +10,7 @@
   --theme-color-2-dark: #211F2D;
   --theme-color-2: #211F2D;
   --theme-color-accent: #3d324a;
+  --theme-foreground: lightgray;
 }
 
 body, :root, #app{
